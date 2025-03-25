@@ -16,7 +16,7 @@ stations = [
 ]
 
 # Ajouter une clé API de OpenWeatherMap (remplacez par votre propre clé)
-API_KEY = "149dc3c1376cc13a4c5d1a788e3be683"
+API_KEY = ""
 
 # Demander à l'utilisateur de choisir une station dans la liste déroulante
 station = st.selectbox("Choisissez une station de ski :", stations)
