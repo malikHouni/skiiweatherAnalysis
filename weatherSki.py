@@ -1,73 +1,90 @@
 import streamlit as st
 import requests
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+import folium
+from streamlit_folium import folium_static
 
-# Configuration de la page
-st.set_page_config(page_title="Conditions Météorologiques de Ski", layout="wide")
-
-# Titre de l'application
-st.title("🌨️ Analyse des Conditions Météorologiques pour les Stations de Ski 🎿")
-
-# Liste des stations de ski populaires
-stations = [
-    "Chamonix", "Courchevel", "Val d'Isère", "Les Arcs", "Zermatt", 
-    "St. Anton", "Aspen", "Whistler", "Banff", "Tignes"
-]
-
-# Ajouter une clé API de OpenWeatherMap (remplacez par votre propre clé)
+# Clé API OpenWeatherMap
 API_KEY = ""
 
-# Demander à l'utilisateur de choisir une station dans la liste déroulante
-station = st.selectbox("Choisissez une station de ski :", stations)
+# Hugging Face Inference API Settings
+HF_TOKEN = ""
+HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"  # Replace with the model you wish to use
 
-# Fonction pour récupérer les données météo
-def get_weather_data(station):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={station}&appid={API_KEY}&units=metric"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return None
+# Liste des stations de ski avec coordonnées
+stations_ski = {
+    "Courchevel": (45.4154, 6.6345),
+    "Val Thorens": (45.2979, 6.5790),
+    "Chamonix": (45.9237, 6.8694),
+    "Tignes": (45.4681, 6.9054),
+    "Les Arcs": (45.5724, 6.8281),
+    "Méribel": (45.3963, 6.5652),
+    "Avoriaz": (46.1912, 6.7706),
+}
 
-# Récupérer les données météo pour la station sélectionnée
-weather_data = get_weather_data(station)
+# Interface Streamlit
+st.title("🏔️ Météo & Chatbot des Stations de Ski")
 
-if weather_data:
-    # Extraire les informations des données récupérées
-    temp = weather_data['main']['temp']
-    humidity = weather_data['main']['humidity']
-    wind_speed = weather_data['wind']['speed']
-    weather_description = weather_data['weather'][0]['description']
-    snow = weather_data['snow'] if 'snow' in weather_data else {'1h': 0}
+station = st.selectbox("Choisissez une station :", list(stations_ski.keys()))
 
-    # Affichage des informations avec un peu de style
-    st.subheader(f"🌤️ Conditions actuelles à {station.capitalize()} :")
-    st.markdown(f"**Température** : {temp} °C")
-    st.markdown(f"**Humidité** : {humidity} %")
-    st.markdown(f"**Vitesse du vent** : {wind_speed} km/h")
-    st.markdown(f"**Conditions météo** : {weather_description.capitalize()}")
-    st.markdown(f"**Chutes de neige** : {snow.get('1h', 0)} cm dans l'heure")
+# API OpenWeatherMap
+URL = "https://api.openweathermap.org/data/2.5/weather"
+params = {"q": station, "appid": API_KEY, "units": "metric", "lang": "fr"}
 
-    # Graphique des conditions météorologiques
-    st.subheader("📊 Graphique des Conditions Météorologiques")
-    labels = ['Température (°C)', 'Humidité (%)', 'Vitesse du Vent (km/h)', 'Neige (cm)']
-    values = [temp, humidity, wind_speed, snow.get('1h', 0)]
+response = requests.get(URL, params=params)
 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.bar(labels, values, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
+if response.status_code == 200:
+    data = response.json()
+    icon_code = data["weather"][0]["icon"]
+    icon_url = f"https://openweathermap.org/img/wn/{icon_code}@2x.png"
 
-    # Ajouter des titres et labels aux axes
-    ax.set_ylabel('Valeurs', fontsize=12)
-    ax.set_title(f"Conditions Météorologiques à {station.capitalize()}", fontsize=14)
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))  # Y axis without decimals
+    st.success(f"📍 **{station}** - {data['weather'][0]['description'].capitalize()}")
+    st.image(icon_url, width=100)
+    st.metric(label="🌡 Température", value=f"{data['main']['temp']}°C")
+    st.metric(label="💨 Vent", value=f"{data['wind']['speed']} m/s")
+    st.metric(label="💧 Humidité", value=f"{data['main']['humidity']}%")
 
-    # Ajouter les valeurs sur chaque barre
-    for i, v in enumerate(values):
-        ax.text(i, v + 0.5, str(v), color='black', ha='center', fontsize=12)
-
-    # Afficher le graphique
-    st.pyplot(fig)
+    # Carte Folium
+    st.subheader("📌 Localisation de la station")
+    station_coords = stations_ski[station]
+    map_ski = folium.Map(location=station_coords, zoom_start=10)
+    folium.Marker(station_coords, popup=station, icon=folium.Icon(color="blue")).add_to(map_ski)
+    folium_static(map_ski)
 
 else:
-    st.error(f"🚫 Impossible de récupérer les données météo pour {station}. Vérifie le nom de la station.")
+    st.error(f"🚫 Impossible de récupérer la météo pour {station}. Vérifie l'API.")
+
+# 💬 Chatbot Hugging Face
+st.subheader("💬 Chatbot Ski & Météo")
+user_input = st.text_input("Pose une question sur la météo ou la station :")
+
+if user_input:
+    # Contexte intelligent pour guider le modèle
+    contexte = f"""
+    Actuellement, la météo à {station} est :
+    - Température : {data['main']['temp']}°C
+    - Vent : {data['wind']['speed']} m/s
+    - Humidité : {data['main']['humidity']}%
+    - Conditions : {data['weather'][0]['description'].capitalize()}
+
+    Question : {user_input}
+    Réponse :
+    """
+
+    # API request to Hugging Face Inference
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "inputs": contexte,
+        "options": {"use_cache": False},
+    }
+
+    api_url = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+    api_response = requests.post(api_url, headers=headers, json=payload)
+
+    if api_response.status_code == 200:
+        response_data = api_response.json()
+        st.write("🤖 " + response_data[0]["generated_text"])
+    else:
+        st.error(f"🚫 Error in reaching the API: {api_response.status_code} - {api_response.text}")
