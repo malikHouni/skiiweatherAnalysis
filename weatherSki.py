@@ -4,10 +4,10 @@ import folium
 from streamlit_folium import folium_static
 
 # Clé API OpenWeatherMap
-API_KEY = ""
+API_KEY = st.secrets["weather_API_KEY"]
 
 # Hugging Face Inference API Settings
-HF_TOKEN = ""
+HF_TOKEN = st.secrets["mistral_API_KEY"]
 HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"  # Replace with the model you wish to use
 
 # Liste des stations de ski avec coordonnées
